@@ -1,0 +1,6 @@
+{
+  "name": "HermitDB: Local-First Sandbox",
+  "description": "An interactive offline-first data workspace, database visualizer, and sync architecture simulator running entirely in-browser with zero internet access.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
