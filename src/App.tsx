@@ -23,6 +23,7 @@ import StorageInspector from './components/StorageInspector';
 import SchemaBuilder from './components/SchemaBuilder';
 import CryptModule from './components/CryptModule';
 import Terminal from './components/Terminal';
+import { generateMnemonicPhrase } from './lib/secureCrypto';
 
 // Icons
 import { 
@@ -89,6 +90,17 @@ export default function App() {
     return localStorage.getItem('hermit_secret_key') || 'hermit-local-token-931';
   });
 
+  // Zero-Knowledge Recovery Phrase States
+  const [recoveryPhrase, setRecoveryPhrase] = useState(() => {
+    const saved = localStorage.getItem('hermit_recovery_phrase');
+    if (saved) return saved;
+    const phrase = generateMnemonicPhrase();
+    return phrase;
+  });
+  const [recoveryVerified, setRecoveryVerified] = useState(() => {
+    return localStorage.getItem('hermit_recovery_verified') === 'true';
+  });
+
   // Current active sync conflicts discovered
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
 
@@ -136,10 +148,19 @@ export default function App() {
     localStorage.setItem('hermit_secret_key', secretKey);
   }, [secretKey]);
 
+  useEffect(() => {
+    localStorage.setItem('hermit_recovery_phrase', recoveryPhrase);
+  }, [recoveryPhrase]);
+
+  useEffect(() => {
+    localStorage.setItem('hermit_recovery_verified', String(recoveryVerified));
+  }, [recoveryVerified]);
+
   // Boot up seed message logs
   useEffect(() => {
     addLog('SYSTEM', 'info', 'Sandbox storage drivers initialized. LocalStorage binding complete.');
     addLog('SYSTEM', 'success', `Zero-knowledge keys loaded via virtual PBKDF2 context ${secretKey.substring(0, 4)}****`);
+    addLog('SYSTEM', 'crypto', 'Zero-Knowledge 24-word Emergency Seed Phrase initialized securely.');
     addLog('SERVER', 'info', `Local server state validated. ${serverDB.length} primary keys monitored.`);
   }, []);
 
@@ -524,6 +545,23 @@ export default function App() {
     }
   };
 
+  const handleRestoreBackup = (backupData: any) => {
+    try {
+      if (backupData.schemas) setSchemas(backupData.schemas);
+      if (backupData.clientADB) setClientADB(backupData.clientADB);
+      if (backupData.clientBDB) setClientBDB(backupData.clientBDB);
+      if (backupData.serverDB) setServerDB(backupData.serverDB);
+      if (typeof backupData.encryptionEnabled === 'boolean') setEncryptionEnabled(backupData.encryptionEnabled);
+      if (backupData.secretKey) {
+        setSecretKey(backupData.secretKey);
+        addLog('SYSTEM', 'crypto', `Master symmetric storage key synchronized to backup: ${backupData.secretKey.substring(0,4)}****`);
+      }
+      addLog('SYSTEM', 'success', 'Local encrypted database backup restored successfully. Core caches recalculated.');
+    } catch (e: any) {
+      addLog('SYSTEM', 'error', `Failed to restore database backup: ${e.message}`);
+    }
+  };
+
   const handleFullReseedWipe = () => {
     localStorage.removeItem('hermit_schemas');
     localStorage.removeItem('hermit_server_db');
@@ -793,6 +831,15 @@ export default function App() {
               onAddRecord={handleAddRecord}
               onUpdateRecord={handleUpdateRecord}
               onDeleteRecord={handleDeleteRecord}
+              encryptionEnabled={encryptionEnabled}
+              secretKey={secretKey}
+              onUpdateSecretKey={(val) => {
+                setSecretKey(val);
+                addLog('SYSTEM', 'crypto', `Master secret key reset via seed phrase recovery. Symmetrical storage keys re-derived.`);
+              }}
+              recoveryPhrase={recoveryPhrase}
+              setRecoveryPhrase={setRecoveryPhrase}
+              addLog={addLog}
             />
           )}
 
@@ -812,6 +859,8 @@ export default function App() {
               server={serverDB}
               encryptionEnabled={encryptionEnabled}
               onClearStorage={handleClearStorage}
+              onRestoreBackup={handleRestoreBackup}
+              addLog={addLog}
             />
           )}
 
@@ -827,6 +876,11 @@ export default function App() {
                 setSecretKey(val);
                 addLog('SYSTEM', 'crypto', `Virtual symmetric key shifted. Regulating cipher matrices.`);
               }}
+              recoveryPhrase={recoveryPhrase}
+              setRecoveryPhrase={(val) => setRecoveryPhrase(val)}
+              recoveryVerified={recoveryVerified}
+              onSetRecoveryVerified={setRecoveryVerified}
+              addLog={addLog}
             />
           )}
 

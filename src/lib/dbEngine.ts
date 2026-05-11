@@ -10,6 +10,18 @@ import {
 // Predefined default schemas
 export const DEFAULT_SCHEMAS: SchemaDefinition[] = [
   {
+    id: 'passwords',
+    name: 'Vault Credentials',
+    description: 'Secure, local AES-256 encrypted credentials and authentication secrets.',
+    fields: [
+      { name: 'service', type: 'string', required: true },
+      { name: 'username', type: 'string', required: true },
+      { name: 'password', type: 'string', required: true },
+      { name: 'category', type: 'string', required: true, defaultValue: 'Personal' },
+      { name: 'website', type: 'string', required: false, defaultValue: 'https://' },
+    ]
+  },
+  {
     id: 'tasks',
     name: 'Tasks',
     description: 'Track developer workflows and project deadlines offline.',
@@ -46,6 +58,22 @@ export const DEFAULT_SCHEMAS: SchemaDefinition[] = [
 export const getInitialRecords = (): { server: ServerRecord[], clientA: ClientRecord[], clientB: ClientRecord[] } => {
   const serverInitial: ServerRecord[] = [
     {
+      id: 'pwd_1',
+      collection: 'passwords',
+      data: { id: 'pwd_1', service: 'Google AI Studio', username: 'didarpatwary44@gmail.com', password: 'VaultPassword_Gemini_2026!', category: 'Work', website: 'https://aistudio.google.com' },
+      updatedAt: Date.now() - 3600000,
+      version: 1,
+      lastUpdatedBy: 'SERVER_BOOT'
+    },
+    {
+      id: 'pwd_2',
+      collection: 'passwords',
+      data: { id: 'pwd_2', service: 'GitHub Tech', username: 'didar_dev', password: 'git_token_ghp_5a837b12dce3', category: 'Developer', website: 'https://github.com' },
+      updatedAt: Date.now() - 5400000,
+      version: 1,
+      lastUpdatedBy: 'SERVER_BOOT'
+    },
+    {
       id: 'task_1',
       collection: 'tasks',
       data: { id: 'task_1', title: 'Implement local state DB', status: 'In Progress', priority: 'High', assignee: 'Alice' },
@@ -54,26 +82,10 @@ export const getInitialRecords = (): { server: ServerRecord[], clientA: ClientRe
       lastUpdatedBy: 'SERVER_BOOT'
     },
     {
-      id: 'task_2',
-      collection: 'tasks',
-      data: { id: 'task_2', title: 'Define offline conflict policy', status: 'Backlog', priority: 'Low', assignee: 'Unassigned' },
-      updatedAt: Date.now() - 7200000,
-      version: 1,
-      lastUpdatedBy: 'SERVER_BOOT'
-    },
-    {
       id: 'note_1',
       collection: 'notes',
       data: { id: 'note_1', caption: 'LoomDB Stack', content: 'Vite + React + LocalStorage + WebCrypto Encryption', tags: ['local-first', 'tech-stack'] },
       updatedAt: Date.now() - 1800000,
-      version: 1,
-      lastUpdatedBy: 'SERVER_BOOT'
-    },
-    {
-      id: 'contact_1',
-      collection: 'contacts',
-      data: { id: 'contact_1', name: 'John Doe', email: 'john@hermitdb.org', phone: '+1 (555) 0199' },
-      updatedAt: Date.now() - 5400000,
       version: 1,
       lastUpdatedBy: 'SERVER_BOOT'
     }

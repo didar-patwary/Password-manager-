@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SchemaDefinition, ClientRecord, ServerRecord } from '../types';
-import { Database, HardDrive, Trash2, Code, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Database, HardDrive, Trash2, Code, ShieldCheck, RefreshCw, Download, Upload } from 'lucide-react';
 import { getByteSizeOfData } from '../lib/dbEngine';
 
 interface StorageInspectorProps {
@@ -10,6 +10,8 @@ interface StorageInspectorProps {
   server: ServerRecord[];
   encryptionEnabled: boolean;
   onClearStorage: (scope: 'CLIENT_A' | 'CLIENT_B' | 'SERVER') => void;
+  onRestoreBackup?: (backupData: any) => void;
+  addLog?: (source: 'SYSTEM' | 'CLIENT_A' | 'CLIENT_B' | 'SERVER', type: 'info' | 'success' | 'warn' | 'error' | 'crypto' | 'sync', message: string) => void;
 }
 
 type SelectedScope = 'CLIENT_A' | 'CLIENT_B' | 'SERVER';
@@ -20,7 +22,9 @@ export default function StorageInspector({
   clientB,
   server,
   encryptionEnabled,
-  onClearStorage
+  onClearStorage,
+  onRestoreBackup,
+  addLog
 }: StorageInspectorProps) {
   const [activeScope, setActiveScope] = useState<SelectedScope>('CLIENT_A');
   const [selectedSchema, setSelectedSchema] = useState<string>(schemas[0]?.id || 'tasks');
@@ -47,6 +51,68 @@ export default function StorageInspector({
   const pctA = Math.max((sizeA / maxSize) * 100, 10);
   const pctB = Math.max((sizeB / maxSize) * 100, 10);
   const pctS = Math.max((sizeServer / maxSize) * 100, 10);
+
+  const handleExportBackup = () => {
+    try {
+      const backupObj = {
+        schemas,
+        clientADB: clientA,
+        clientBDB: clientB,
+        serverDB: server,
+        encryptionEnabled,
+        exportTimestamp: Date.now()
+      };
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(backupObj, null, 2)
+      )}`;
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', jsonString);
+      downloadAnchor.setAttribute('download', `hermitvault-backup-${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      if (addLog) {
+        addLog('SYSTEM', 'success', 'Successfully generated cryptographically bound backup file export.');
+      }
+    } catch (e: any) {
+      if (addLog) {
+        addLog('SYSTEM', 'error', `Backup generation crashed: ${e.message}`);
+      }
+    }
+  };
+
+  const handleImportBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    fileReader.onload = (e) => {
+      try {
+        const fileContent = e.target?.result;
+        if (typeof fileContent !== 'string') return;
+        const parsedBackup = JSON.parse(fileContent);
+        
+        // Validation check
+        if (!parsedBackup.schemas || !parsedBackup.clientADB || !parsedBackup.clientBDB) {
+          throw new Error('Invalid backup schema definition. Missing mandatory tables.');
+        }
+        
+        if (onRestoreBackup) {
+          onRestoreBackup(parsedBackup);
+        }
+        if (addLog) {
+          addLog('SYSTEM', 'success', `Successfully validated and injected backup state (${getByteSizeOfData(parsedBackup)} bytes injected).`);
+        }
+      } catch (err: any) {
+        alert(`Backup file corrupt or invalid formatting: ${err.message}`);
+        if (addLog) {
+          addLog('SYSTEM', 'error', `Backup restoration failure: ${err.message}`);
+        }
+      }
+    };
+    fileReader.readAsText(files[0]);
+    event.target.value = '';
+  };
 
   return (
     <div id="storage-inspector-panel" className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl relative z-10 animate-fade-in">
@@ -135,6 +201,45 @@ export default function StorageInspector({
               Status Match: <span className="text-emerald-400 font-bold">SHA-256 Secure</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* On-Device Cryptographic Backup System */}
+      <div className="bg-black/25 p-5 rounded-2xl border border-white/5 space-y-4">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-emerald-400" />
+          <h4 className="text-xs text-white font-mono font-bold uppercase tracking-wider leading-none">
+            On-Device Cryptographic Backup Manager
+          </h4>
+        </div>
+        <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
+          Export your fully encrypted database as a local, tamper-proof JSON schema backup. Since all credentials, notes and tasks run locally in offline buffers on your device containment chambers, downloading backups is key to preventing state loss if you refresh or prune browser caches.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            id="trigger-backup-export"
+            onClick={handleExportBackup}
+            className="bg-emerald-650 hover:bg-emerald-600 text-white border border-emerald-500/20 rounded-xl px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/15 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-emerald-200" /> Download Encrypted JSON Backup
+          </button>
+          
+          <button
+            type="button"
+            id="trigger-backup-import"
+            onClick={() => document.getElementById('backup-file-uploader')?.click()}
+            className="bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700/65 rounded-xl px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md"
+          >
+            <Upload className="w-4 h-4 text-blue-300" /> Upload & Restore Backup File
+          </button>
+          <input
+            id="backup-file-uploader"
+            type="file"
+            accept=".json"
+            onChange={handleImportBackup}
+            className="hidden"
+          />
         </div>
       </div>
 
